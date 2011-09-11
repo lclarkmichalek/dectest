@@ -11,6 +11,7 @@ class TestSuite():
     for detailing any tests created.
     """
     __run_tests = lambda: True
+    sideaffect_tests = {}
     
     def __init__(self, name):
         """
@@ -28,24 +29,29 @@ class TestSuite():
         
         print "Test Suite '{0}'".format(self.__name)
         print "=" * 80
-        fail = 0
+        fails = 0
         for name, tc in self.future_tests.iteritems():
             args, kwargs = tc["input"]
             output = tc["func"](*args, **kwargs)
-            if output != tc["output"]:
+            failed = False
+            failed = failed or not output == tc["output"]
+            for test in tc["sideaffects"]:
+                failed = failed or not test.test()
+            
+            if failed:
                 sys.stdout.write('f')
-                fail += 1
+                fails += 1
             else:
                 sys.stdout.write('.')
         print "\n",
         print "=" * 80
-        if fail == 0:
+        if fails == 0:
             print "All tests passed successfully"
         else:
-            if fail == 1:
+            if fails == 1:
                 print "1 test failed"
             else:
-                print "{0} tests failed".format(fail)
+                print "{0} tests failed".format(fails)
     
     def register(self, name):
         """
@@ -81,6 +87,13 @@ class TestSuite():
         """
         klass.__run_tests = func
     
+    @classmethod
+    def activate_sideaffect_test(klass, test_klass):
+        """
+        Activates a sideaffect test which test cases can then use.
+        """
+        klass.siteaffect_tests[test_klass.name] = test_klass
+    
     def __getattr__(self, name):
         return TestCase(self, name)
 
@@ -98,7 +111,7 @@ class TestCase():
         if name not in self.parent.future_tests:
             self.parent.future_tests[self.name]["input"] = (), {}
             self.parent.future_tests[self.name]["output"] = None
-
+            self.parent.future_tests[self.name]["sideaffects"] = []
     
     def input(self, *args, **kwargs):
         """
@@ -115,6 +128,12 @@ class TestCase():
         self.parent.future_tests[self.name]["output"] = out
         
         return self._blank_decorator
+    
+    def __getattr__(self, name):
+        if name in self.parent.sideaffect_tests:
+            self.parent.future_tests[self.name]["sideaffects"].append(
+                self.parent.sideaffect_tests[name])
+            return self.parent.sideaffect_tests[name].decorator
 
     def setfunc(self, func):
         """
