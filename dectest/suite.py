@@ -10,7 +10,7 @@ class TestSuite():
     import time, and can then be used to reference decorators that can be used
     for detailing any tests created.
     """
-    __run_tests = lambda: True
+    __run_tests = staticmethod(lambda: True)
     sideaffect_tests = {}
     
     def __init__(self, name):
@@ -69,6 +69,9 @@ class TestSuite():
         
         """
         self.future_tests[name] = {}
+        self.future_tests[name]["input"] = (), {}
+        self.future_tests[name]["output"] = None
+        self.future_tests[name]["sideaffects"] = []
         def decorator(func):
             """
             The decorator for the test function.
@@ -92,7 +95,7 @@ class TestSuite():
         """
         Activates a sideaffect test which test cases can then use.
         """
-        klass.siteaffect_tests[test_klass.name] = test_klass
+        klass.sideaffect_tests[test_klass.name] = test_klass
     
     def __getattr__(self, name):
         return TestCase(self, name)
@@ -108,10 +111,6 @@ class TestCase():
         """
         self.name = name
         self.parent = parent
-        if name not in self.parent.future_tests:
-            self.parent.future_tests[self.name]["input"] = (), {}
-            self.parent.future_tests[self.name]["output"] = None
-            self.parent.future_tests[self.name]["sideaffects"] = []
     
     def input(self, *args, **kwargs):
         """
@@ -131,9 +130,10 @@ class TestCase():
     
     def __getattr__(self, name):
         if name in self.parent.sideaffect_tests:
+            sat = self.parent.sideaffect_tests[name]()
             self.parent.future_tests[self.name]["sideaffects"].append(
-                self.parent.sideaffect_tests[name])
-            return self.parent.sideaffect_tests[name].decorator
+                sat)
+            return sat.decorator
 
     def setfunc(self, func):
         """
