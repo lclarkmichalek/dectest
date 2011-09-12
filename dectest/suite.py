@@ -93,6 +93,9 @@ class TestSuite():
         function is called with no arguments, and should return a boolean with
         `True` indicating that tests should be run.
         """
+        if type(func) == bool:
+            func = lambda: func
+        
         klass.__run_tests = func
     
     @classmethod
