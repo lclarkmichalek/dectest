@@ -92,6 +92,9 @@ class TestSuite():
         Sets the function that will determine whether tests are run or not. The
         function is called with no arguments, and should return a boolean with
         `True` indicating that tests should be run.
+        
+        If this function recives a boolean value, it will automatically be
+        converted into a lambda returning the passed value.
         """
         if type(func) == bool:
             func = lambda: func
