@@ -9,6 +9,13 @@ class SideAffectTest():
     """
     name = ""
     
+    def pre_test(self):
+        """
+        Called before the function that is being tested is run. An optional
+        callback.
+        """
+        return
+    
     def test(self):
         """
         The actuall test that will be run. Should return `True` for success,

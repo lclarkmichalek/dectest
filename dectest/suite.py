@@ -31,10 +31,15 @@ class TestSuite():
         print "=" * 80
         fails = 0
         for name, tc in self.future_tests.iteritems():
+            for test in tc["sideaffects"]:
+                test.pre_test()
+            
             args, kwargs = tc["input"]
             output = tc["func"](*args, **kwargs)
+            
             failed = False
             failed = failed or not output == tc["output"]
+            
             for test in tc["sideaffects"]:
                 failed = failed or not test.test()
             
