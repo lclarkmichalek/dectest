@@ -74,3 +74,61 @@ class GlobalStateChange(SideAffectTest):
             return func
         
         return dec
+
+class ClassStateChange(SideAffectTest):
+    """
+    A side affect test for changes in a class' state.
+    
+    >>> ts = TestSuite("class state suite")
+    >>> ts.activate_sideaffect_test(ClassStateChange)
+    >>> class TestedClass():
+    ...     a = 3
+    ...     
+    ...     @ts.register("tc")
+    ...     @ts.tc.in(4)
+    ...     @ts.tc.classstatechange({'a': 4})
+    ...     def change_state(self, new_a):
+    ...         self.a = new_a
+    ...
+    """
+    
+    name = "classstatechange"
+    
+    def decorator(self, change):
+        """
+        Takes a dict of items that should be in the class' namespace, and
+        stores them for use by the :class:`ClassStateChange` later.
+        """
+        self.change = change
+        
+        def dec(func):
+            """
+            Get the function, to make the class state accessible later.
+            """
+            self.func = func
+            return func
+        return dec
+    
+    def pre_test(self):
+        """
+        Checks that all the variables that need to be checked for changes
+        are in the class state.
+        """
+        self.failed = False
+        for varname in self.change:
+            if not hasattr(self.func.__self__, varname):
+                self.failed = True
+    
+    def test(self):
+        """
+        Checks that the state has changed as determined by the argument passed
+        to the decorator function.
+        """
+        if self.failed:
+            return False
+        
+        for varname, newval in self.change:
+            if not getattr(self.func.__self__, varname) == newval:
+                return False
+        
+        return True
