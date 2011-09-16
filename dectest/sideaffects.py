@@ -53,7 +53,13 @@ class GlobalStateChange(SideAffectTest):
     ... def add(delta):
     ...     globalvar += delta
     ...
-    >>> ts.test()
+    >>> @ts.register("tc2")
+    ... @ts.tc2.input(1)
+    ... @ts.tc2.globalstatechange({'globalvar': 1})
+    ... def set(i):
+    ...     global globalvar
+    ...     globalvar = i
+    ...
     """
     name = "globalstatechange"
     
@@ -90,6 +96,11 @@ class GlobalStateChange(SideAffectTest):
         variable given as a key will be retreived before and after the function
         is run, and both are then passed to the tester function. If the tester
         function returns `True`, then the test has passed.
+        
+        The dictionary may also have keys that are non callable values. If a
+        value is found that isn't callable, it will just be compared for
+        equality with the value of the associated variable after the tested
+        function has been called.
         """
         self.tests = tests
         def dec(func):
