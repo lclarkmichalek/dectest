@@ -43,11 +43,31 @@ class SideAffectTest():
 class GlobalStateChange(SideAffectTest):
     """
     A side affect test for changes in global state.
+    
+    >>> ts = TestSuite("global state suite")
+    >>> ts.activate_sideaffect_test(GlobalStateChange)
+    >>> globalvar = 3
+    >>> @ts.register("tc")
+    ... @ts.tc.input(1)
+    ... @ts.tc.globalstatechange({'globalvar': (lambda a, b: a + 1 == b)})
+    ... def add(delta):
+    ...     globalvar += delta
+    ...
+    >>> ts.test()
     """
     name = "globalstatechange"
     
     func = None
-    change = {}
+    pre_call = {}
+    tests = {}
+    
+    def pre_test(self):
+        """
+        Called before the tested function is called, so we use this to capture
+        the global variables' state before the function is called.
+        """
+        for varname in self.tests:
+            self.pre_call[varname] = self.func.__globals__[varname]
     
     def test(self):
         """
@@ -55,17 +75,23 @@ class GlobalStateChange(SideAffectTest):
         `self.initglobal.update(self.expectedglobal)`.
         """
         glob = self.func.__globals__
-        for key in self.change:
-            if self.change[key] != glob[key]:
-                return False
+        for varname, test in self.tests.iteritems():
+            if callable(test):
+                if not test(self.pre_call[varname], glob[varname]):
+                    return False
+            else:
+                if test != glob[varname]:
+                    return False
         return True
     
-    def decorator(self, change):
+    def decorator(self, tests):
         """
-        Takes a dict of items that should be in the global state, and stores
-        them for the :method:`test` to check.
+        Takes a dictionary mapping variable names to tester functions. Each
+        variable given as a key will be retreived before and after the function
+        is run, and both are then passed to the tester function. If the tester
+        function returns `True`, then the test has passed.
         """
-        self.change = change
+        self.tests = tests
         def dec(func):
             """
             Get the function, so as to retrieve the global state later.
