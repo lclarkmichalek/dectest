@@ -143,6 +143,9 @@ class ClassStateChange(SideAffectTest):
             Get the function, to make the class state accessible later.
             """
             self.func = func
+            if not hasattr(self.func, "__self__"):
+                raise TypeError(
+                    "Decorated function must be a method of a class")
             return func
         return dec
     
