@@ -2,7 +2,11 @@
 The main test suite class, class:`TestSuite` is found in this module.
 """
 
+import functools
+import logging
 import sys
+
+from . import config as mconfig
 
 class TestSuite():
     """
@@ -10,27 +14,44 @@ class TestSuite():
     import time, and can then be used to reference decorators that can be used
     for detailing any tests created.
     """
-    __run_tests = staticmethod(lambda: True)
-    sideaffect_tests = {}
+    _sideaffect_tests = {}
     
-    def __init__(self, name):
+    def __init__(self, name, config=None, logger=None):
         """
         Initialises the test suite, mainly populating some hidden attributes.
         """
-        self.__name = name
-        self.future_tests = {}
+        if config is None:
+            config = mconfig.DefaultConfig()
+        if logger is None:
+            logger = logging.getLogger(name)
+        
+        self._config = config
+        self._name = name
+        self._future_tests = {}
+        
+        for name in self._config.get_list('testing', 'sideaffects') or []:
+            sat = self._config.get_python(name)
+            
+            if not sat:
+                raise Warning("Could not find side affect test named" + 
+                              name)
+            
+            self._sideaffect_tests[sat.name] = sat
+        
+        self._run_tests = self._config.get_bool('testing', 'runtests') or \
+            self._config.get_default('testing', 'runtests')
     
     def test(self):
         """
         Runs all the test cases.
         """
-        if not self.__run_tests():
+        if not self._run_tests:
             return
         
-        print "Test Suite '{0}'".format(self.__name)
+        print "Test Suite '{0}'".format(self._name)
         print "=" * 80
         fails = 0
-        for name, tc in self.future_tests.iteritems():
+        for name, tc in self._future_tests.iteritems():
             for test in tc["sideaffects"]:
                 test.pre_test()
             
@@ -58,7 +79,7 @@ class TestSuite():
             else:
                 print "{0} tests failed".format(fails)
     
-    def register(self, name):
+    def register(self, name, method=False):
         """
         Creates a new test case, with the given name. The :class:`TestCase`
         object will be availible as an attribute of the :class:`TestSuite` with
@@ -72,97 +93,176 @@ class TestSuite():
         >>> type(ts.tc)
         <class 'dectest.suite.TestCase'>
         
+        
+        Note: If the decorated object is a method of a class, then the `method`
+        argument must be true. This is because dectest cannot obtain a copy of
+        an instance of the class untill runtime, so we need to know if to catch
+        the `self` variable.
         """
-        self.future_tests[name] = {}
-        self.future_tests[name]["input"] = (), {}
-        self.future_tests[name]["output"] = None
-        self.future_tests[name]["sideaffects"] = []
+        if name in self._future_tests:
+            
+            print("Cannot register the same test case twice.")
+            return self._blank_decorator
+        
+        self._future_tests[name] = {}
+        self._future_tests[name]["input"] = (), {}
+        self._future_tests[name]["output"] = None
+        self._future_tests[name]["sideaffects"] = []
         def decorator(func):
             """
             The decorator for the test function.
             """
-            self.future_tests[name]["func"] = func
-            return func
+            self._future_tests[name]["func"] = func
+            
+            self._future_tests[name]["method"] = method
+            self._future_tests[name]["self"] = None
+            
+            func.tested = False
+            
+            @functools.wraps(func)
+            def test_dec(*args, **kwargs):
+                if method and not self._future_tests[name]["self"]:
+                    self._future_tests[name]["self"] = args[0]
+                
+                if not func.tested and self._run_tests and \
+                        self._config.get_bool("testing", "testasrun"):
+                    self._setup_test(name)
+                    
+                    passed = self._test_func(name)
+                    
+                    self._teardown_test(name)
+                    
+                    self._log_result(name, passed)
+                    
+                    func.tested = True
+                
+                return func(*args, **kwargs)
+            return test_dec
         
         return decorator
     
-    @classmethod
-    def set_run_tests(klass, func):
+    def _setup_test(self, name):
         """
-        Sets the function that will determine whether tests are run or not. The
-        function is called with no arguments, and should return a boolean with
-        `True` indicating that tests should be run.
-        
-        If this function recives a boolean value, it will automatically be
-        converted into a lambda returning the passed value.
+        Runs all the pre_test methods on all the registered sideaffect tests.
+        Allso calls the pre test callback, which can be set at configuration 
+        value `testing.pretest`.
         """
-        if type(func) == bool:
-            func = lambda: func
+        pretest = self._config.get("testing", "pretest")
+        if pretest:
+           obj = self._config.get_python(pretest)
+           if callable(obj):
+               obj()
+           else:
+               raise Warning("Pre-test callback was not callable")
         
-        klass.__run_tests = func
+        tc = self._future_tests[name]
+        for test in tc["sideaffects"]:
+            test.pre_test()
     
-    @classmethod
-    def activate_sideaffect_test(klass, test_klass):
+    def _test_func(self, name):
         """
-        Activates a sideaffect test which test cases can then use.
+        Runs the test case with name `name`. Returns `True` if the test case
+        passed, `False` otherwise.
         """
-        klass.sideaffect_tests[test_klass.name] = test_klass
+        tc = self._future_tests[name]
+        
+        args, kwargs = tc["input"]
+        
+        if tc["method"]:
+            args = (tc["self"],) + args
+        
+        output = tc["func"](*args, **kwargs)
+        
+        failed = False
+        failed = failed or not output == tc["output"]
+        
+        for test in tc["sideaffects"]:
+            failed = failed or not test.test()
+        
+        return not failed
+    
+    def _teardown_test(self, name):
+        """
+        Tears down after the test has been run.
+        
+        This runs the post test callback, which can be set at confiuration value
+        `testing.posttest`.
+        """
+        posttest = self._config.get("testing", "posttest")
+        if posttest:
+           obj = self._config.get_python(posttest)
+           if callable(obj):
+               obj()
+           else:
+               raise Warning("Post-test callback was not callable")
+    
+    def _log_result(self, name, passed):
+        """
+        Logs the result of a test of a function.
+        """
+        print "Test case {0} ".format(name) + ("passed" if passed else "failed")
     
     def __getattr__(self, name):
-        return TestCase(self, name)
-
-class TestCase():
-    """
-    An individual testcase. Automatically created by
-    :method:`TestSuite.register`.
-    """
-    def __init__(self, parent, name):
-        """
-        Initialises state.
-        """
-        self.name = name
-        self.parent = parent
-    
-    def input(self, *args, **kwargs):
-        """
-        Sets the input for the test function when testing commenses.
-        """
-        self.parent.future_tests[self.name]['input'] = (args, kwargs)
+        # Rebind parent as we want to use self in our nested class
+        parent = self
         
-        return self._blank_decorator
-    
-    def out(self, out=None):
-        """
-        Sets the expected output of the test function.
-        """
-        self.parent.future_tests[self.name]["output"] = out
-        
-        return self._blank_decorator
-    
-    def __getattr__(self, name):
-        if name in self.parent.sideaffect_tests:
-            sat = self.parent.sideaffect_tests[name]()
-            self.parent.future_tests[self.name]["sideaffects"].append(
-                sat)
-            return sat.decorator
+        class TestCase():
+            """
+            An individual testcase. Generated on command, as a wrapper for the
+            data stored by the :class:`TestSuite`
+            """
+            def __init__(self, name):
+                """
+                Initialises state.
+                """
+                self.name = name
+                
+            def input(self, *args, **kwargs):
+                """
+                Sets the input for the test function when testing commenses.
+                """
+                parent._future_tests[self.name]['input'] = (args, kwargs)
+                
+                return self._blank_decorator
+            
+            def out(self, out=None):
+                """
+                Sets the expected output of the test function.
+                """
+                parent._future_tests[self.name]["output"] = out
+                
+                return self._blank_decorator
+            
+            def __getattr__(self, name):
+                if name in parent._sideaffect_tests:
+                    sat = parent._sideaffect_tests[name]()
+                    parent._future_tests[self.name]["sideaffects"].append(
+                        sat)
+                    return sat.decorator
+                
+            def setfunc(self, func):
+                """
+                Sets the function to test.
+                """
+                parent._future_tests[self.name]["func"] = func
+                
+            def test(self):
+                """
+                Runs the specific test case.
+                """
+                args, kwargs = self.input
+                assert self.test_func(*args, **kwargs) == self.out, \
+                    "TestCase {0} failed".format(self.name)
 
-    def setfunc(self, func):
-        """
-        Sets the function to test.
-        """
-        self.parent.future_tests[self.name]["func"] = func
-    
-    def test(self):
-        """
-        Runs the specific test case.
-        """
-        args, kwargs = self.input
-        assert self.test_func(*args, **kwargs) == self.out, \
-               "TestCase {0} failed".format(self.name)
-    
-    @staticmethod
-    def _blank_decorator(func):
-        """
-        Just a decorator that does nothing.
-        """
-        return func
+            @staticmethod
+            def _blank_decorator(func):
+                """
+                Just a decorator that does nothing.
+                """
+                return func
+
+        if name in self._future_tests:
+            return TestCase(name)
+        else:
+            raise AttributeError("No test case {0}".format(name))
+

@@ -3,6 +3,8 @@ This module contains various side affect tests that can be registered with a
 :class:`TestSuite`.
 """
 
+import functools
+
 class SideAffectTest():
     """
     A base class for other side affect tests.
@@ -44,8 +46,9 @@ class GlobalStateChange(SideAffectTest):
     """
     A side affect test for changes in global state.
     
-    >>> ts = TestSuite("global state suite")
-    >>> ts.activate_sideaffect_test(GlobalStateChange)
+    >>> ts = TestSuite("global state suite",
+    ...     DictConfig({'testing':
+    ...         {'sideaffects': ['dectest.sideaffects.GlobalStateChange']}}))
     >>> globalvar = 3
     >>> @ts.register("tc")
     ... @ts.tc.input(1)
@@ -116,12 +119,12 @@ class ClassStateChange(SideAffectTest):
     """
     A side affect test for changes in a class' state.
     
-    >>> ts = TestSuite("class state suite")
-    >>> ts.activate_sideaffect_test(ClassStateChange)
+    >>> ts = TestSuite("class state suite", DictConfig({'testing':
+                {'sideaffects': ['dectest.sideaffects.ClassStateChange']}}))
     >>> class TestedClass():
     ...     a = 3
     ...     
-    ...     @ts.register("tc")
+    ...     @ts.register("tc", method=True)
     ...     @ts.tc.in(4)
     ...     @ts.tc.classstatechange({'a': 4})
     ...     def change_state(self, new_a):
@@ -131,44 +134,46 @@ class ClassStateChange(SideAffectTest):
     
     name = "classstatechange"
     
-    def decorator(self, change):
+    def decorator(self, tests):
         """
         Takes a dict of items that should be in the class' namespace, and
         stores them for use by the :class:`ClassStateChange` later.
         """
-        self.change = change
+        self.tests = tests
+        self.f_state = {}
+        self.s_state = {}
         
         def dec(func):
             """
             Get the function, to make the class state accessible later.
             """
-            self.func = func
-            if not hasattr(self.func, "__self__"):
-                raise TypeError(
-                    "Decorated function must be a method of a class")
-            return func
+            # We need to get the states like this as we can't get them from
+            # the func object, as it is unbound, so has no __self__ attribute.
+            @functools.wraps(func)
+            def inner(*args, **kwargs):
+                if not self.f_state:
+                    for varname in self.tests:
+                        self.f_state[varname] = getattr(args[0], varname)
+                out = func(*args, **kwargs)
+                if not self.s_state:
+                    for varname in self.tests:
+                        self.s_state[varname] = getattr(args[0], varname)
+                return out
+            
+            return inner
         return dec
-    
-    def pre_test(self):
-        """
-        Checks that all the variables that need to be checked for changes
-        are in the class state.
-        """
-        self.failed = False
-        for varname in self.change:
-            if not hasattr(self.func.__self__, varname):
-                self.failed = True
     
     def test(self):
         """
         Checks that the state has changed as determined by the argument passed
         to the decorator function.
         """
-        if self.failed:
-            return False
-        
-        for varname, newval in self.change:
-            if not getattr(self.func.__self__, varname) == newval:
-                return False
+        for varname, tester in self.tests.items():
+            if callable(tester):
+                if not tester(self.f_state[varname], self.s_state[varname]):
+                    return False
+            else:
+                if not tester == self.s_state[varname]:
+                    return False
         
         return True
