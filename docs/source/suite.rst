@@ -1,0 +1,4 @@
+Suite
+=====
+
+.. automodule:: dectest.suite

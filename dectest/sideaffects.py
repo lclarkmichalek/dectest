@@ -36,7 +36,7 @@ class SideAffectTest():
         return self.blank_decorator
     
     @staticmethod
-    def blank_decoratr(func):
+    def blank_decorator(func):
         """
         A decorator that does nothing.
         """
