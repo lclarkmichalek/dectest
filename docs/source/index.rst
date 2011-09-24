@@ -14,6 +14,7 @@ Contents:
    intro
    rationale
    
+   dectest
    suite
    sideaffects
    config

@@ -1,7 +1,7 @@
 .. module:: dectest.sideaffects
 
-Side Affect Tests
-=================
+dectest.sideaffects
+===================
 
 Side affects are important to test for, as in almost any non-functional
 language, they are used extensivly. dectest provides generic tests to test for

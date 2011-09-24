@@ -1,5 +1,5 @@
-Config
-======
+dectest.config
+==============
 
 .. automodule:: dectest.config
    :no-members:

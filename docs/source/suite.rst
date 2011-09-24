@@ -1,4 +1,4 @@
-Suite
-=====
+dectest.suite
+=============
 
 .. automodule:: dectest.suite
