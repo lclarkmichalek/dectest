@@ -238,16 +238,16 @@ class PythonFileConfig(ConfigInterface):
     The file should define a class for each section, with attributes for each
     value. The class names and attribute names are not case sensitive
     
-    For example:
+    For example::
     
-    class section1:
-        item1 = 0
-        item2 = "one"
-        item3 = True
+        # dectest_config.py
+        class section1:
+            item1 = 0
+            item2 = "one"
+            item3 = True
     
-    class section2:
-        foo = "bar"
-    EOF
+        class section2:
+            foo = "bar"
     """
     
     def __init__(self, filename):
