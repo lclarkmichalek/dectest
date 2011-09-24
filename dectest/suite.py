@@ -148,8 +148,8 @@ class TestSuite():
         ... def test():
         ...     return
         ...
-        >>> type(ts.tc)
-        <class 'dectest.suite.TestCase'>
+        >>> ts.tc
+        <dectest.suite.TestCase instance at 0xb71fcc2c>
         
         
         Note: If the decorated object is a method of a class, then the `method`
