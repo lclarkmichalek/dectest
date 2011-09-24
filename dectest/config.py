@@ -85,12 +85,21 @@ class ConfigInterface():
         Converts the config value into a boolean. If the value is a string, then
         a number of values will be checked. The mappings are:
         
-        'yes' -> True
-        'true' -> True
-        'y' -> True
-        'no' -> False
-        'false' -> False
-        'n' -> False
+        +-------+------+
+        | str   | bool |
+        +=======+======+
+        |'yes'  |      |
+        +-------+      |
+        |'true' | True |
+        +-------+      |
+        |'y'    |      |
+        +-------+------+
+        |'no'   |      |
+        +-------+      |
+        |'false'| False|
+        +-------+      |
+        |'n'    |      |
+        +-------+------+
         
         These values are not case sensitive. If the value is not a string or a
         boolean, then `None` will be returned.
