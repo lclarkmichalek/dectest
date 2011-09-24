@@ -130,3 +130,28 @@ out::
     3
     >>> print pfconfig.get("section2", "item2")
     4
+
+Config options
+..............
+
+For a complete list of all the configuration nodes that dectest listens to,
+inspect the ``DEFAULTS`` in the :mod:`~dectest.config` module. However, there
+are some values that are exceedingly usefull to set, these are listed below:
+
++----------+-------------+------+---------------------------------------------+
+| Section  |     Item    | type | Effect                                      |
++==========+=============+======+=============================================+
+| testing  | runtests    | bool | If true, tests are run                      |
++----------+-------------+------+---------------------------------------------+
+| testing  | testasrun   | bool | If true, tests are run as the function they |
+|          |             |      | decorate is run                             |
++----------+-------------+------+---------------------------------------------+
+| testing  | sideaffects | list | A list of the python names of the side      |
+|          |             |      | affect tests you want activated             |
++----------+-------------+------+---------------------------------------------+
+| testing  | pretest     | str  | The python name of a function to be run     |
+|          |             |      | before any tests are run                    |
++----------+-------------+------+---------------------------------------------+
+| testing  | posttest    | str  | The python name of a function to be run     |
+|          |             |      | after any tests are run                     |
++----------+-------------+------+---------------------------------------------+
