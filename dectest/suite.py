@@ -14,6 +14,63 @@ class TestSuite():
     import time, and can then be used to reference decorators that can be used
     for detailing any tests created.
     """
+    
+    class TestCase():
+        """
+        An individual testcase. Generated on command, as a wrapper for the
+        data stored by the :class:`TestSuite`
+        """
+        def __init__(self, name, parent):
+            """
+            Initialises state.
+            """
+            self.name = name
+            self.parent = parent
+            
+        def input(self, *args, **kwargs):
+            """
+            Sets the input for the test function when testing commenses.
+            """
+            self.parent._future_tests[self.name]['input'] = (args, kwargs)
+            
+            return self._blank_decorator
+        
+        def out(self, out=None):
+            """
+            Sets the expected output of the test function.
+            """
+            self.parent._future_tests[self.name]["output"] = out
+            
+            return self._blank_decorator
+        
+        def __getattr__(self, name):
+            if name in self.parent._sideaffect_tests:
+                sat = self.parent._sideaffect_tests[name]()
+                self.parent._future_tests[self.name]["sideaffects"].append(
+                    sat)
+                return sat.decorator
+            
+        def setfunc(self, func):
+            """
+            Sets the function to test.
+            """
+            self.parent._future_tests[self.name]["func"] = func
+            
+        def test(self):
+            """
+            Runs the specific test case.
+            """
+            args, kwargs = self.input
+            assert self.test_func(*args, **kwargs) == self.out, \
+                "TestCase {0} failed".format(self.name)
+            
+        @staticmethod
+        def _blank_decorator(func):
+            """
+            Just a decorator that does nothing.
+            """
+            return func
+    
     _sideaffect_tests = {}
     
     def __init__(self, name, config=None, logger=None):
@@ -203,66 +260,8 @@ class TestSuite():
         print "Test case {0} ".format(name) + ("passed" if passed else "failed")
     
     def __getattr__(self, name):
-        # Rebind parent as we want to use self in our nested class
-        parent = self
-        
-        class TestCase():
-            """
-            An individual testcase. Generated on command, as a wrapper for the
-            data stored by the :class:`TestSuite`
-            """
-            def __init__(self, name):
-                """
-                Initialises state.
-                """
-                self.name = name
-                
-            def input(self, *args, **kwargs):
-                """
-                Sets the input for the test function when testing commenses.
-                """
-                parent._future_tests[self.name]['input'] = (args, kwargs)
-                
-                return self._blank_decorator
-            
-            def out(self, out=None):
-                """
-                Sets the expected output of the test function.
-                """
-                parent._future_tests[self.name]["output"] = out
-                
-                return self._blank_decorator
-            
-            def __getattr__(self, name):
-                if name in parent._sideaffect_tests:
-                    sat = parent._sideaffect_tests[name]()
-                    parent._future_tests[self.name]["sideaffects"].append(
-                        sat)
-                    return sat.decorator
-                
-            def setfunc(self, func):
-                """
-                Sets the function to test.
-                """
-                parent._future_tests[self.name]["func"] = func
-                
-            def test(self):
-                """
-                Runs the specific test case.
-                """
-                args, kwargs = self.input
-                assert self.test_func(*args, **kwargs) == self.out, \
-                    "TestCase {0} failed".format(self.name)
-
-            @staticmethod
-            def _blank_decorator(func):
-                """
-                Just a decorator that does nothing.
-                """
-                return func
-
         if name in self._future_tests:
-            return TestCase(name)
+            return self.TestCase(name, self)
         else:
             raise AttributeError("No test case {0}".format(name))
 
