@@ -11,7 +11,7 @@ Installation
 Installation is simple enough. First get the code from dectest's git
 repository::
 
-    $ git clone |gitremote|
+    $ git clone git://github.com/bluepeppers/dectest.git
     $ cd dectest
 
 After that, build and install dectest with the ``setup.py`` file. You will need
