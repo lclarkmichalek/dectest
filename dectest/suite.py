@@ -1,5 +1,5 @@
 """
-The main test suite class, class:`TestSuite` is found in this module.
+The main test suite class, :class:`TestSuite` is found in this module.
 """
 
 import functools
