@@ -49,6 +49,7 @@ class TestSuite():
                 self.parent._future_tests[self.name]["sideaffects"].append(
                     sat)
                 return sat.decorator
+            raise AttributeError()
             
         def setfunc(self, func):
             """
