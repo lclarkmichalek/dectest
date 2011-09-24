@@ -48,11 +48,11 @@ Now for the fun part, actually testing something. First we need to register a
 new test case, using the :meth:`~dectest.suite.TestSuite.register` decorator.
 After that, we need to define the input and output for the test case. These will
 default to ``None``. We use the :meth:`~dectest.suite.TestSuite.TestCase.input`
-and the :meth:`~dectest.suite.TestSuite.TestCase.output` decorators for this::
+and the :meth:`~dectest.suite.TestSuite.TestCase.out` decorators for this::
     
     @testsuite.register("testcase")
     @testsuite.testcase.input(3, i=2)
-    @testsuite.testcase.output(5)
+    @testsuite.testcase.out(5)
     def increment(value, incrementer=1):
         return value + incrementer
 
