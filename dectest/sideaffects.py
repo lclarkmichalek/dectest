@@ -72,6 +72,7 @@ class GlobalStateChange(SideAffectTest):
     func = None
     pre_call = {}
     tests = {}
+    failed = False
     
     def pre_test(self):
         """
@@ -79,15 +80,23 @@ class GlobalStateChange(SideAffectTest):
         the global variables' state before the function is called.
         """
         for varname in self.tests:
+            if varname not in self.func.__globals__:
+                self.failed = True
             self.pre_call[varname] = self.func.__globals__[varname]
     
     def test(self):
         """
-        Returns true if the `self.func.__globals__` is equal to 
-        `self.initglobal.update(self.expectedglobal)`.
+        Returns ``True`` if the ``self.func.__globals__`` is equal to 
+        ``self.initglobal.update(self.expectedglobal)``.
         """
+        if self.failed:
+            return False
+        
         glob = self.func.__globals__
         for varname, test in self.tests.iteritems():
+            if varname not in glob:
+                return False
+            
             if callable(test):
                 if not test(self.pre_call[varname], glob[varname]):
                     return False
@@ -145,6 +154,7 @@ class ClassStateChange(SideAffectTest):
         self.tests = tests
         self.f_state = {}
         self.s_state = {}
+        self.failed = False
         
         def dec(func):
             """
@@ -156,11 +166,19 @@ class ClassStateChange(SideAffectTest):
             def inner(*args, **kwargs):
                 if not self.f_state:
                     for varname in self.tests:
-                        self.f_state[varname] = getattr(args[0], varname)
+                        if not hasattr(args[0], varname):
+                            self.failed = True
+                            break
+                        else:
+                            self.f_state[varname] = getattr(args[0], varname)
                 out = func(*args, **kwargs)
                 if not self.s_state:
                     for varname in self.tests:
-                        self.s_state[varname] = getattr(args[0], varname)
+                        if not hasattr(args[0], varname):
+                            self.failed = True
+                            break
+                        else:
+                            self.s_state[varname] = getattr(args[0], varname)
                 return out
             
             return inner
@@ -171,6 +189,9 @@ class ClassStateChange(SideAffectTest):
         Checks that the state has changed as determined by the argument passed
         to the decorator function.
         """
+        if self.failed:
+            return False
+        
         for varname, tester in self.tests.items():
             if callable(tester):
                 if not tester(self.f_state[varname], self.s_state[varname]):
