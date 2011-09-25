@@ -84,6 +84,7 @@ class TestSuite():
             logger = logging.getLogger(name)
         
         self._config = config
+        self._logger = logger
         self._name = name
         self._future_tests = {}
         
@@ -91,10 +92,10 @@ class TestSuite():
             sat = self._config.get_python(name)
             
             if not sat:
-                raise Warning("Could not find side affect test named" + 
-                              name)
-            
-            self._sideaffect_tests[sat.name] = sat
+                self._logger.warning("Could not find side affect test named" + 
+                                     name)
+            else:
+                self._sideaffect_tests[sat.name] = sat
         
         self._run_tests = self._config.get_bool('testing', 'runtests') or \
             self._config.get_default('testing', 'runtests')
@@ -211,7 +212,7 @@ class TestSuite():
            if callable(obj):
                obj()
            else:
-               raise Warning("Pre-test callback was not callable")
+               self._logger.warning("Pre-test callback was not callable")
         
         tc = self._future_tests[name]
         for test in tc["sideaffects"]:
@@ -252,7 +253,7 @@ class TestSuite():
            if callable(obj):
                obj()
            else:
-               raise Warning("Post-test callback was not callable")
+               self._logger.warning("Post-test callback was not callable")
     
     def _log_result(self, name, passed):
         """
