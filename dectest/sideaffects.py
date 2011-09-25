@@ -11,6 +11,9 @@ class SideAffectTest():
     """
     name = ""
     
+    def __init__(self, logger):
+        self._logger = logger
+    
     def pre_test(self):
         """
         Called before the function that is being tested is run. An optional

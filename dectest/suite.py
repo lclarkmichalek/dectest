@@ -45,7 +45,7 @@ class TestSuite():
         
         def __getattr__(self, name):
             if name in self.parent._sideaffect_tests:
-                sat = self.parent._sideaffect_tests[name]()
+                sat = self.parent._sideaffect_tests[name](self.parent._logger)
                 self.parent._future_tests[self.name]["sideaffects"].append(
                     sat)
                 return sat.decorator
