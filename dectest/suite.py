@@ -178,7 +178,24 @@ class TestSuite():
 class TestCase():
     """
     An invididual test case, containing all the information it needs to be
-    tested.
+    tested. This class should not be created manually, as instances will be
+    automatically created and made accessible from the :class:`~.TestSuite`
+    class.
+    
+    Side affect tests can be used from this class. For example, the
+    :class:`~dectest.sideaffects.GlobalStateChange` side affect test can be
+    activated as show below::
+    
+        ts = TestSuite(__name__)
+        
+        @ts.register('a')
+        @ts.a.globalstatechange({})
+        def foo():
+            reuturn
+        
+        print ts.a.__class__
+        # dectest.suite.TestCase
+    
     """
     
     def __init__(self, config, logger, activated_sideaffects, method, name):
@@ -196,7 +213,7 @@ class TestCase():
     
     def input(self, *args, **kwargs):
         """
-        Sets the input to the function in the test case.
+        Sets the input to the function in the test case. This is a decorator.
         """
         self._input = args, kwargs
         
@@ -205,6 +222,7 @@ class TestCase():
     def out(self, output=None):
         """
         Sets the expected/predicted output of the function in the test case.
+        This is a decorator.
         """
         self._output = output
         
