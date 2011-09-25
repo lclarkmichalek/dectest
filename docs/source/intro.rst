@@ -157,3 +157,132 @@ are some values that are exceedingly usefull to set, these are listed below:
 +----------+-------------+------+---------------------------------------------+
 
 For a full reference, see the :doc:`config_reference`.
+
+A note on types
+^^^^^^^^^^^^^^^
+
+In general, dectest will try to do "the right thing" with regard to types. For
+instance, if the specified type for an option is ``bool`` and the configuration
+value has the type ``str``, then dectest will run through a mapping from str to
+bool trying to convert the types. For more information on this specific example,
+see the documentation for :meth:`~dectest.config.ConfigInterface.get_bool`.
+Similarly, if a config option asks for a python name, but is given a python
+object instead, then it will adapt without complaint.
+
+Side affect tests
+-----------------
+
+Side affects are vital to test for, so we need to have a way to do so with
+decorators. Enter the creativly named "side affect tests". Side affect test are
+generic tests that can be enabled in config and then used as decorators. The
+easiest way to explain this is probabaly via an example::
+
+    #!/usr/bin/python2.7
+    # side_affect_test.py
+    from dectest import TestSuite, DictConfig
+    
+    config = {
+        'testing': {
+	     'sideaffects': ['dectest.sideaffects.GlobalStateChange'],
+             }
+         }
+    
+    testsuite = TestSuite(__name__, config=DictConfig(config))
+    
+    global var
+    var = 3
+    
+    @testsuite.register("global_change")
+    @testsuite.global_change.input(3)
+    @testsuite.global_change.globalstatechange({'var': 3})
+    def set_state(i):
+        var = i
+
+Importing this and running the ``set_state`` function will result in a passed
+test. We can also give the sideaffect test a function to test for relative
+changes in state::
+
+    @testsuite.register("global_change")
+    @testsuite.global_change.input(1)
+    @testsuite.global_change.globalstatechange(
+                                  {'var': (lambda a, b: a + 1 == b)})
+    def increment_state(i):
+        var += i
+
+The lambda (or function) will be passed the value of the variable before the
+function is called, and then the value after the function is called.
+
+Writing side affect tests
+:::::::::::::::::::::::::
+
+dectest only provides two (very generic) side affect tests by default:
+:class:`~dectest.sideaffects.GlobalStateChange` and 
+:class:`~dectest.sideaffects.ClassStateChange`. This might seem worrying, as
+neither provides any kind of specialised testing. However, it is very easy to
+write side affect tests. A base class
+:class:`~dectest.sideaffects.SideAffectTest` is provided, which gives sane
+defaults, allowing the side affect test developer to override only the methods
+he needs.
+
+The methods that dectest will call at the appropriate times are:
+
+* ``decorator(*args, **kwargs)`` - The decorator provided to users to activate
+  the side affect test.
+* ``test()`` - The actual testing function, should return ``True`` if the test
+  has passed, otherwise ``False``.
+* ``pre_test()`` - Called before the tested function is run.
+
+It also looks for two attributes
+
+* ``name`` - The name of the side affect test (the attribute it will be 
+  accessible from from the :class:`~dectest.suite.TestCase` class). This
+  attribute is required, without it your side affect test will not work.
+* ``needs_instance`` - Does the test case need a copy of the instance the
+  tested function is bound to.
+
+``decorator``
+.............
+
+The decorator function is exposed to the user by the test case. For example, the
+decorator function of the :class:`~dectest.sideaffects.ClassStateChange` class
+might be exposed to the user as ``testsuite.testcase.classtatechange``.
+Let's use an example here (output is in the comments)::
+
+    #!/usr/bin/python2.7
+    # first_side_affect_test.py
+    from dectest import TestSuite, DictConfig
+    from dectest.sideaffects import SideAffectTest
+    
+    class FirstSideAffectTest(SideAffectTest):
+        name = "firsttest"
+	
+	def decorator(self, *args, **kwargs):
+	    print args, kwargs
+	    def inner_decorator(function):
+	        print "Got function " + function
+		
+		def wrapper(*args, **kwargs):
+		    print "Running function"
+		    return function(*args, **kwargs)
+		return wrapper
+	    return inner_decorator
+    
+    config = {'testing': {'sideaffects': [FirstSideAffectTest]}}
+    ts = TestSuite(__name__, config=DictConfig(config))
+    
+    @ts.register("tc")
+    @ts.tc.firsttest(1, a=3)
+    def foo():
+        return
+    # (1,), {'a': 3}
+    # Got function <function foo at 0x9624304>
+    
+    foo()
+    # Running function
+
+This example shows two things. The first is how the ``name`` attribute of a
+side affect test affects the attribute of the test case it is accessible from;
+the ``name`` attribute of the the ``FirstSideAffectTest`` class is
+``"firsttest"``, thus we access it's decorator via ``ts.tc.firsttest``. The
+second thing that this example shows is just how many levels of nesting are 
+required if you want to overwrite the actuall function that is being decorated.
