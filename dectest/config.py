@@ -1,7 +1,7 @@
 """
 The configurations system for dectest. Offers two different methods of
-configuration, via the .ini format, or via a pure python file. Each method
-is implemented in a different class, but they both provide the same interface.
+configuration; as a python file or from a dict. Each method is implemented in a
+different class, but they all provide the same interface.
 """
 
 import imp
