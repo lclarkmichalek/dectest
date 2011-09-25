@@ -34,7 +34,7 @@ class SideAffectTest():
         as the side affect test. As this is a decorator, it must return a
         function. If only the arguments are going to be used, and the function
         does not need to be modified, return
-        :method:`SideAffectTest.blank_decorator`.
+        :meth:`~SideAffectTest.blank_decorator`.
         """
         return self.blank_decorator
     
