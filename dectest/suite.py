@@ -15,49 +15,6 @@ class TestSuite():
     for detailing any tests created.
     """
     
-    class TestCase():
-        """
-        An individual testcase. Generated on command, as a wrapper for the
-        data stored by the :class:`TestSuite`
-        """
-        def __init__(self, name, parent):
-            """
-            Initialises state.
-            """
-            self.name = name
-            self.parent = parent
-            
-        def input(self, *args, **kwargs):
-            """
-            Sets the input for the test function when testing commenses.
-            """
-            self.parent._future_tests[self.name]['input'] = (args, kwargs)
-            
-            return self._blank_decorator
-        
-        def out(self, out=None):
-            """
-            Sets the expected output of the test function.
-            """
-            self.parent._future_tests[self.name]["output"] = out
-            
-            return self._blank_decorator
-        
-        def __getattr__(self, name):
-            if name in self.parent._sideaffect_tests:
-                sat = self.parent._sideaffect_tests[name](self.parent._logger)
-                self.parent._future_tests[self.name]["sideaffects"].append(
-                    sat)
-                return sat.decorator
-            raise AttributeError()
-            
-        @staticmethod
-        def _blank_decorator(func):
-            """
-            Just a decorator that does nothing.
-            """
-            return func
-    
     _sideaffect_tests = {}
     
     def __init__(self, name, config=None, logger=None):
@@ -73,7 +30,9 @@ class TestSuite():
         self._config.set_logger(logger)
         self._logger = logger
         self._name = name
-        self._future_tests = {}
+        
+        self._testcases = {}
+        self._tests = {}
         
         for name in self._config.get_list('testing', 'sideaffects') or []:
             sat = self._config.get_python(name)
@@ -145,52 +104,149 @@ class TestSuite():
            obtain a copy of an instance of the class untill runtime, so we need
            to know if to catch the `self` variable.
         """
-        if name in self._future_tests:
+        if name in self._testcases:
             self._logger.warning("Cannot register the same test case twice.")
             return self._blank_decorator
         
-        self._future_tests[name] = {}
-        self._future_tests[name]["input"] = (), {}
-        self._future_tests[name]["output"] = None
-        self._future_tests[name]["sideaffects"] = []
+        tc = TestCase(self._config, self._logger, 
+                      self._sideaffect_tests, method, name)
+        
         def decorator(func):
             """
             The decorator for the test function.
             """
-            self._future_tests[name]["func"] = func
+            # If we've seen this function before
+            if hasattr(func, "_original_function"):
+                actuall_func = func._original_function
+            # or if it's brand new
+            else:
+                actuall_func = func
+                actuall_func.tested = False
             
-            self._future_tests[name]["method"] = method
-            self._future_tests[name]["self"] = None
+            tc.set_func(actuall_func)
             
-            func.tested = False
+            if not actuall_func in self._tests:
+                self._tests[actuall_func] = [tc]
+            else:
+                self._tests[actuall_func].append(tc)
             
             @functools.wraps(func)
             def test_dec(*args, **kwargs):
-                if method and not self._future_tests[name]["self"]:
-                    self._future_tests[name]["self"] = args[0]
-                
-                if not func.tested and self._run_tests and \
+                if not actuall_func.tested and self._run_tests and \
                         self._config.get_bool("testing", "testasrun"):
-                    self._setup_test(name)
+
+                    if self._tests[actuall_func][0].needs_self():
+                        for tc in self._tests[actuall_func]:
+                            if tc.needs_self():
+                                tc.set_self(args[0])
                     
-                    passed = self._test_func(name)
+                    self._test_function(actuall_func)
                     
-                    self._teardown_test(name)
-                    
-                    self._log_result(name, passed)
-                    
-                    func.tested = True
+                    actuall_func.tested = True
                 
                 return func(*args, **kwargs)
+            test_dec._original_function = actuall_func
+            
             return test_dec
         
+        self._testcases[name] = tc
         return decorator
     
-    def _setup_test(self, name):
+    def _test_function(self, func):
         """
-        Runs all the pre_test methods on all the registered sideaffect tests.
-        Allso calls the pre test callback, which can be set at configuration 
-        value `testing.pretest`.
+        Runs all of the test cases associated with the given function.
+        """
+        testcases = self._tests[func]
+        
+        for tc in testcases:
+            out = tc.test()
+            self._log_result(tc.name, out)
+    
+    def _log_result(self, name, passed):
+        """
+        Logs the result of a test of a function.
+        """
+        print "Test case {0} ".format(name) + ("passed" if passed else "failed")
+    
+    def __getattr__(self, name):
+        if name in self._testcases:
+            return self._testcases[name]
+        else:
+            raise AttributeError("No test case {0}".format(name))
+
+
+class TestCase():
+    """
+    An invididual test case, containing all the information it needs to be
+    tested.
+    """
+    
+    def __init__(self, config, logger, activated_sideaffects, method, name):
+        self._raw_func = None
+        self._method = method
+        self._self = None
+        self._input = (), {}
+        self._output = None
+        self._sideaffects = []
+        self._activated_sideaffects = activated_sideaffects
+        self.name = name
+        
+        self._config = config
+        self._logger = logger
+    
+    def input(self, *args, **kwargs):
+        """
+        Sets the input to the function in the test case.
+        """
+        self._input = args, kwargs
+        
+        return self._blank_decorator
+    
+    def out(self, output=None):
+        """
+        Sets the expected/predicted output of the function in the test case.
+        """
+        self._output = output
+        
+        return self._blank_decorator
+    
+    def set_func(self, func):
+        """
+        Sets the function that is being tested.
+        """
+        self._raw_func = func
+
+    def needs_self(self):
+        """
+        Returns ``True`` if the test case needs a value for self, and does not
+        have one set. Returns ``False`` otherwise.
+        """
+        return self._method and not self._self
+    
+    def set_self(self, self_):
+        """
+        Sets the "self" of the method that is being tested.
+        """
+        self._self = self_
+    
+    def test(self):
+        """
+        Runs the test case and returns ``True`` if the test case passed,
+        otherwise ``False``.
+        """
+        self._pre_test()
+        
+        out = self._run_test()
+        
+        self._post_test()
+        
+        return out
+    
+    def _pre_test(self):
+        """
+        Runs any global pre test functions, along with the
+        :meth:`~dectest.sideaffects.SideAffectTest.pre_test` method on every
+        side affect test in use.
         """
         pretest = self._config.get("testing", "pretest")
         if pretest:
@@ -200,38 +256,31 @@ class TestSuite():
            else:
                self._logger.warning("Pre-test callback was not callable")
         
-        tc = self._future_tests[name]
-        for test in tc["sideaffects"]:
+        for test in self._sideaffects:
             test.pre_test()
     
-    def _test_func(self, name):
+    def _run_test(self):
         """
-        Runs the test case with name `name`. Returns `True` if the test case
-        passed, `False` otherwise.
+        Runs the actuall test. Returns ``True`` on pass, otherwise ``False``.
         """
-        tc = self._future_tests[name]
+        args, kwargs = self._input
         
-        args, kwargs = tc["input"]
+        if self._method:
+            args = (self._self,) + args
         
-        if tc["method"]:
-            args = (tc["self"],) + args
+        output = self._raw_func(*args, **kwargs)
         
-        output = tc["func"](*args, **kwargs)
+        passed = True
+        passed = passed and output == self._output
         
-        failed = False
-        failed = failed or not output == tc["output"]
+        for test in self._sideaffects:
+            passed = passed and test.test()
         
-        for test in tc["sideaffects"]:
-            failed = failed or not test.test()
-        
-        return not failed
+        return passed
     
-    def _teardown_test(self, name):
+    def _post_test(self):
         """
-        Tears down after the test has been run.
-        
-        This runs the post test callback, which can be set at confiuration value
-        `testing.posttest`.
+        Runs any global post test functions.
         """
         posttest = self._config.get("testing", "posttest")
         if posttest:
@@ -241,15 +290,19 @@ class TestSuite():
            else:
                self._logger.warning("Post-test callback was not callable")
     
-    def _log_result(self, name, passed):
-        """
-        Logs the result of a test of a function.
-        """
-        print "Test case {0} ".format(name) + ("passed" if passed else "failed")
-    
     def __getattr__(self, name):
-        if name in self._future_tests:
-            return self.TestCase(name, self)
-        else:
-            raise AttributeError("No test case {0}".format(name))
-
+        """
+        Make the side affect tests accessable at their given names.
+        """
+        if name in self._activated_sideaffects:
+            sat = self._activated_sideaffects[name](self._logger)
+            self._sideaffects.append(sat)
+            return sat.decorator
+        raise AttributeError()
+    
+    @staticmethod
+    def _blank_decorator(func):
+        """
+        Just a decorator that does nothing.
+        """
+        return func
