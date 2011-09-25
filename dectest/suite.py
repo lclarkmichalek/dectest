@@ -51,20 +51,6 @@ class TestSuite():
                 return sat.decorator
             raise AttributeError()
             
-        def setfunc(self, func):
-            """
-            Sets the function to test.
-            """
-            self.parent._future_tests[self.name]["func"] = func
-            
-        def test(self):
-            """
-            Runs the specific test case.
-            """
-            args, kwargs = self.input
-            assert self.test_func(*args, **kwargs) == self.out, \
-                "TestCase {0} failed".format(self.name)
-            
         @staticmethod
         def _blank_decorator(func):
             """
