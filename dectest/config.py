@@ -17,6 +17,16 @@ DEFAULTS = {
         }
     }
 
+class DummyLogger():
+    """
+    A dummy logger to allow quite degregation.
+    """
+    def __getattr__(self, _):
+        """
+        Return a callable that does nothing at all.
+        """
+        return lambda *args, **kwargs: None
+
 class ConfigInterface():
     """
     An interface that all classes implementing config methods should inherit.
@@ -28,6 +38,8 @@ class ConfigInterface():
     * store
     * reload() (optional)
     """
+    
+    _logger = DummyLogger()
     
     @property
     def store(self):
@@ -60,9 +72,9 @@ class ConfigInterface():
         if section_name not in values:
             if section_name not in DEFAULTS:
                 # Then we have a program error
-                raise Warning(
+                self._logger.warning(
                     "Config section " + section_name + 
-                            " does not exist in config or as default")
+                    " does not exist in config or as default")
                 return
 
             section = DEFAULTS[section_name]
@@ -71,7 +83,7 @@ class ConfigInterface():
             
         if item_name not in section:
             if item_name not in DEFAULTS[section_name]:
-                raise Warning(
+                self._logger.warning(
                     "Config value {0}.{1}".format(
                         section_name, item_name) + 
                     " does not exist in config or as a default")
@@ -165,7 +177,7 @@ class ConfigInterface():
         
         path = name.split(".")
         if len(path) < 2:
-            raise Warning("Invalid python path: " + name)
+            self._logger.warning("Invalid python path: " + name)
             return
         
         module_path = path[:-1]
@@ -184,11 +196,18 @@ class ConfigInterface():
         for attribute in attribute_path:
             current = getattr(current, attribute)
             if not current:
-                raise Warning("Could not find attribute for python path " +
-                              name)
+                self._logger.warning("Could not find attribute for python" +
+                                     " path " + name)
                 return
         
         return current
+    
+    def set_logger(self, logger):
+        """
+        Sets the logger that the config class can use to report any errors or
+        warnings in ``get_foo`` methods.
+        """
+        self._logger = logger
     
     def _import_module(self, name):
         """
@@ -267,8 +286,9 @@ class PythonFileConfig(ConfigInterface):
             module = imp.load_source('config', self.filename)
         except Exception as e:
             self.store = DEFAULTS
-            raise Warning("Could not load configuration file " + self.filename +
-                          ", raised exception " + str(e))
+            self._logger.warning("Could not load configuration file " +
+                                 self.filename + ", raised exception " +
+                                 str(e))
             return
         
         self.store = {}

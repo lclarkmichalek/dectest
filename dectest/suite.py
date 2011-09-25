@@ -84,6 +84,7 @@ class TestSuite():
             logger = logging.getLogger(name)
         
         self._config = config
+        self._config.set_logger(logger)
         self._logger = logger
         self._name = name
         self._future_tests = {}
