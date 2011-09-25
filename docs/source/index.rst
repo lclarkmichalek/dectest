@@ -13,6 +13,7 @@ Contents:
    
    intro
    rationale
+   config_reference
    
    dectest
    suite

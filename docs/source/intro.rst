@@ -155,3 +155,5 @@ are some values that are exceedingly usefull to set, these are listed below:
 | testing  | posttest    | str  | The python name of a function to be run     |
 |          |             |      | after any tests are run                     |
 +----------+-------------+------+---------------------------------------------+
+
+For a full reference, see the :doc:`config_reference`.
