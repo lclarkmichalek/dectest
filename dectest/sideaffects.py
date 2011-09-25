@@ -14,6 +14,17 @@ class SideAffectTest():
     def __init__(self, logger):
         self._logger = logger
     
+    @property
+    def needs_instance(self):
+        """
+        If this attribute is ``True`` then the ``instance`` attribute of the
+        side affect test will be set to a captured value of the the ``self``
+        argument from when the function was called and tested.
+        
+        The default value of this argument is False
+        """
+        return False
+    
     def pre_test(self):
         """
         Called before the function that is being tested is run. An optional
@@ -145,6 +156,7 @@ class ClassStateChange(SideAffectTest):
     """
     
     name = "classstatechange"
+    needs_instance = True
     
     def decorator(self, tests):
         """
@@ -156,33 +168,20 @@ class ClassStateChange(SideAffectTest):
         self.s_state = {}
         self.failed = False
         
-        def dec(func):
-            """
-            Get the function, to make the class state accessible later.
-            """
-            # We need to get the states like this as we can't get them from
-            # the func object, as it is unbound, so has no __self__ attribute.
-            @functools.wraps(func)
-            def inner(*args, **kwargs):
-                if not self.f_state:
-                    for varname in self.tests:
-                        if not hasattr(args[0], varname):
-                            self.failed = True
-                            break
-                        else:
-                            self.f_state[varname] = getattr(args[0], varname)
-                out = func(*args, **kwargs)
-                if not self.s_state:
-                    for varname in self.tests:
-                        if not hasattr(args[0], varname):
-                            self.failed = True
-                            break
-                        else:
-                            self.s_state[varname] = getattr(args[0], varname)
-                return out
-            
-            return inner
-        return dec
+        return self.blank_decorator
+    
+    def pre_test(self):
+        """
+        Use the ``instance`` attribute that was assigned by the
+        :class:`~dectest.suite.TestCase` to store the specified pieces of the
+        state before the tested function is run.
+        """
+        for varname in self.tests:
+            if not hasattr(self.instance, varname):
+                self.failed = True
+                break
+            else:
+                self.f_state[varname] = getattr(self.instance, varname)
     
     def test(self):
         """
@@ -191,6 +190,13 @@ class ClassStateChange(SideAffectTest):
         """
         if self.failed:
             return False
+        
+        for varname in self.tests:
+            if not hasattr(self.instance, varname):
+                return False
+                break
+            else:
+                self.s_state[varname] = getattr(self.instance, varname)
         
         for varname, tester in self.tests.items():
             if callable(tester):

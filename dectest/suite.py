@@ -239,13 +239,17 @@ class TestCase():
         Returns ``True`` if the test case needs a value for self, and does not
         have one set. Returns ``False`` otherwise.
         """
-        return self._method and not self._self
+        return (self._method and not self._self) or\
+            any(sat.needs_instance for sat in self._sideaffects)
     
     def set_self(self, self_):
         """
         Sets the "self" of the method that is being tested.
         """
         self._self = self_
+        for sat in self._sideaffects:
+            if sat.needs_instance:
+                sat.instance = self_
     
     def test(self):
         """
