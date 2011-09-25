@@ -140,10 +140,10 @@ class TestSuite():
         <dectest.suite.TestCase instance at 0xb71fcc2c>
         
         
-        .. important:: If the decorated object is a method of a class, then the
-           `method` argument must be true. This is because dectest cannot obtain
-           a copy of an instance of the class untill runtime, so we need to know
-           if to catch the `self` variable.
+        .. warning:: If the decorated object is a method of a class, then the
+           ``method`` argument **must** be true. This is because dectest cannot
+           obtain a copy of an instance of the class untill runtime, so we need
+           to know if to catch the `self` variable.
         """
         if name in self._future_tests:
             
