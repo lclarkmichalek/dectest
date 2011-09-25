@@ -146,8 +146,7 @@ class TestSuite():
            to know if to catch the `self` variable.
         """
         if name in self._future_tests:
-            
-            print("Cannot register the same test case twice.")
+            self._logger.warning("Cannot register the same test case twice.")
             return self._blank_decorator
         
         self._future_tests[name] = {}
